@@ -4,6 +4,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.linalg import expm
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import matplotlib.animation
 from numpy.linalg import norm
 from matplotlib.lines import Line2D
@@ -212,7 +213,7 @@ class path_generation():
 
         droneSideLenght = 0.15
         obstBuffer = droneSideLenght*1.5
-        nUAVs = len(xs) #number of UAVs, check it
+        nUAVs = len(xs) 
 
         # Number of intermediate way points
         n = math.ceil(nObs/5)*3
@@ -279,7 +280,7 @@ class path_generation():
 
         # Initialization Position
         for i in range(nPop):
-  
+            print(i)
             if i > 0:
                 self.particle[i][0].Position = self.CreateRandomSolution(self.model,self.particle[0][0].Position)
             else:
@@ -316,6 +317,7 @@ class path_generation():
             # Update Global Best
             if self.particle[i][0].Best.Cost < self.GlobalBest.Best.Cost:
                 self.GlobalBest.Best = self.particle[i][0].Best
+                print(self.GlobalBest.Best.Cost)
 
         # Array to hold best cost values at each iteration
         BestCost = np.zeros((self.MaxIt,1))
@@ -325,6 +327,7 @@ class path_generation():
         model_update = self.model
         for it in range(self.MaxIt):
             for i in range(nPop):
+                print(i)
                 # x part
                 # update velocity
                 self.particle[i][0].Velocity.x = w*np.array(self.particle[i][0].Velocity.x) + \
@@ -434,7 +437,7 @@ class path_generation():
             print ("Iteration " + str(it) + ": Best Cost = " + str(BestCost[it]) + str(Flag))
 
             #figure(1)
-            self.PlotSolution(self.GlobalBest.Sol, model_update,it)
+            # self.PlotSolution(self.GlobalBest.Sol, model_update,it)
 
             # update target info and obstacles info in model
             # obstacles are moving at various velocities at various directions
@@ -588,10 +591,10 @@ class path_generation():
         # self.bx.set_zlabel('Z[m]','FontSize',16,'FontWeight','bold')
         self.bx.set_zlabel('Z')
 
-
+        nc = matplotlib.colors.Normalize(vmin=0, vmax=nUAVs)
         for i in range(nUAVs):
             # self.bx.plot3D(xx[((i-1)*100):(100*i-1)], yy[((i-1)*100):(100*i-1)], zz[((i-1)*100):(100*i-1)],'m','LineWidth',2)
-            self.bx.plot3D(xx[(i*100):(100*(i+1))], yy[(i*100):(100*(i+1))], zz[(i*100):(100*(i+1))],color = 'g')
+            self.bx.plot3D(xx[(i*100):(100*(i+1))], yy[(i*100):(100*(i+1))], zz[(i*100):(100*(i+1))],color = cm.hsv(nc(i)))
             # self.bx.plot3D(XS[(((nVar+2)*(i-1))):(((nVar+2)*(i-1))+nVar+2-1)], YS[(((nVar+2)*(i-1))):(((nVar+2)*(i-1))+nVar+2-1)], ZS[(((nVar+2)*(i-1))):(((nVar+2)*(i-1))+nVar+2-1)],'bo','LineWidth',2)
             self.bx.scatter(XS[((nVar+2)*i):((nVar+2)*(i+1))], YS[((nVar+2)*i):((nVar+2)*(i+1))], ZS[((nVar+2)*i):((nVar+2)*(i+1))],marker='x') 
         
@@ -623,12 +626,12 @@ class path_generation():
         temp_yy = []
         temp_zz = []
 
-        xobs = model.xobs.tolist()
-        yobs = model.yobs.tolist()
-        zobs = model.zobs.tolist()
-        robs = model.robs.tolist()
-        hobs = model.hobs.tolist()
-
+        xobs = model.xobs.tolist().copy()
+        yobs = model.yobs.tolist().copy()
+        zobs = model.zobs.tolist().copy()
+        robs = model.robs.tolist().copy()
+        hobs = model.hobs.tolist().copy()
+        
         for i in range(nUAVs):
 
             x = sol1.x[(nVar*i):(nVar*i+nVar)]
@@ -701,7 +704,7 @@ class path_generation():
 
             nobs = len(xobs) # number of obstacles
             n = len(xx) # number of points to be seperated
-
+            
             for k in range(nobs):
 
                 xx_filtered = []
@@ -713,11 +716,18 @@ class path_generation():
                         xx_filtered.append(xx[j])
                         yy_filtered.append(yy[j])
                         zz_filtered.append(zz[j])
-                d = np.sqrt(np.square(np.array(xx_filtered)-np.array(xobs)[k]) + np.square(np.array(yy_filtered)-yobs[k]))
+                d = ((np.array(xx_filtered)-np.array(xobs)[k])**2 + (np.array(yy_filtered)-yobs[k])**2)**0.5
                 temp = 1-d/robs[k]
+                # print(temp)
                 zero_array = np.zeros_like(temp)
                 v = np.maximum(temp,zero_array)
-                Violation = Violation + np.mean(v)
+                # print(v)
+                if (len(v)!=0):
+                    Violation = Violation + np.mean(v)
+                # print(Violation)
+                if(math.isnan(Violation)):
+                    print("STOP")
+                
             xobs.extend(xx.tolist()[9:90])
             yobs.extend(yy.tolist()[9:90])
             zobs.extend((zz[9:90]+(self.model.obstBuffer+0.15)).tolist())
@@ -1024,8 +1034,8 @@ if __name__ == '__main__':
     ymax = 2
     zmin = 0
     zmax = 2
-    xs = np.array([1.5, -1.5, 1.5, -1.5])
-    ys = np.array([1.5, 1.5, -1.5, -1.5])
+    xs = np.array([1.5, 1.5, 1.5, 1.5])
+    ys = np.array([1.5, 0.5, -0.5, -1.5])
     zs = np.array([0, 0, 0, 0])
     target_init = np.array([1.5, 0.0, 1.6])
     xt = np.array([1.3, 1.5, 1.5, 1.0]) 
