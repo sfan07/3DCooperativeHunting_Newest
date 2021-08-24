@@ -263,7 +263,7 @@ class Sim2D():
                 d_agent_target = norm(look_ahead_pts[n]-self.target_pos, axis = 1)
                 d_vertex_target = norm(self.assigned_vertex_pos-self.target_pos, axis = 1)
                 angular_diff = np.arccos(np.diag(self.agent_vec@self.assigned_vertex_vec.T))
-                radial_diff = d_agent_target-d_vertex_target
+                  = d_agent_target-d_vertex_target
 
                 for j in range (self.num_agents):
                     # get the next waypoint
