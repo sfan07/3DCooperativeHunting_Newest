@@ -26,6 +26,7 @@ class CollisionAvoidance():
         self.d_alp = self.sig_norm(self.d)
         self.d_bet = self.sig_norm(self.d_p)
         self.dw_h = dw_h
+        
     def get_control_all(self, agent_state):
         # DONE
         '''
