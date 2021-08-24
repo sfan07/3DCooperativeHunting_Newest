@@ -292,11 +292,11 @@ class path_generation():
                     yy = np.linspace(self.model.ys[j],self.model.yt[j],self.model.n+2)
                     zz = np.linspace(self.model.zs[j],self.model.zt[j],self.model.n+2)
                     self.particle[i][0].Position.x.extend((xx[1:-1]).tolist())
-                    print('self.particle[i][0].Position.x',self.particle[i][0].Position.x) 
+                    # print('self.particle[i][0].Position.x',self.particle[i][0].Position.x) 
                     self.particle[i][0].Position.y.extend((yy[1:-1]).tolist())
-                    print('self.particle[i][0].Position.y',self.particle[i][0].Position.y) 
+                    # print('self.particle[i][0].Position.y',self.particle[i][0].Position.y) 
                     self.particle[i][0].Position.z.extend((zz[1:-1]).tolist())
-                    print('self.particle[i][0].Position.z',self.particle[i][0].Position.z) 
+                    # print('self.particle[i][0].Position.z',self.particle[i][0].Position.z) 
 
             # Initialize Velocity
             # self.particle[i][0].Velocity.x = np.zeros(VarSize)
@@ -420,7 +420,7 @@ class path_generation():
                 
                 # Update Personal Best
                 if (self.particle[i][0].Cost <self.particle[i][0].Best.Cost):
-                    print(self.particle[i][0].Cost)
+                    # print(self.particle[i][0].Cost)
                     self.particle[i][0].Best = copy.deepcopy(self.particle[i][0])
                     # self.particle[i][0].Best.Position.x = self.particle[i][0].Position.x.copy()
                     # self.particle[i][0].Best.Position.y = self.particle[i][0].Position.y.copy()
@@ -429,7 +429,7 @@ class path_generation():
                     # self.particle[i][0].Best.Sol = self.particle[i][0].Sol.copy() #class sol2()
                     # self.particle[i][0].Best.PathLength = self.particle[i][0].PathLength.copy()
                     
-                    print('self.GlobalBest.Best.Cost at initilization ',self.GlobalBest.Best.Cost)
+                    # print('self.GlobalBest.Best.Cost at initilization ',self.GlobalBest.Best.Cost)
 
                     # Update Global Best
                     if self.particle[i][0].Best.Cost < self.GlobalBest.Best.Cost:
@@ -950,16 +950,16 @@ class path_generation():
             sigma[k] = (dist[k]/(model.n+1))/2
             temp_x = np.random.normal(position.x[(k*model.n):((k+1)*model.n)], sigma[k])
             x.extend(temp_x.tolist())
-            print('position.x',position.x)
-            print('x',x)
+            # print('position.x',position.x)
+            # print('x',x)
             temp_y = np.random.normal(position.y[(k*model.n):((k+1)*model.n)], sigma[k])
             y.extend(temp_y.tolist())
-            print('position.y',position.y)
-            print('y',y)
+            # print('position.y',position.y)
+            # print('y',y)
             temp_z = np.random.normal(position.z[(k*model.n):((k+1)*model.n)], sigma[k])
             z.extend(temp_z.tolist())
-            print('position.z',position.z)
-            print('z',z)
+            # print('position.z',position.z)
+            # print('z',z)
 
         self.sol1.x = x.copy()
         self.sol1.y = y.copy()
@@ -1046,36 +1046,44 @@ if __name__ == '__main__':
     np.random.seed(1)
     random.seed(1)
     Path_Generation = path_generation()
-    # xobs = np.array([-1.8, -1, -0.5, 0, 0.5, 1.7])
-    xobs = np.array([])
-    yobs = np.array([])
-    zobs = np.array([])
-    robs = np.array([])
-    hobs = np.array([])
-    # yobs = np.array([-1.8, 0, 1.5, -0.5, 1.5, -0.5])
-    # zobs = np.array([2, 1.8, 1, 0.5, 1.5, 1.3])
-    # robs = np.array([0.3, 0.1, 0.5, 0.2, 0.4, 0.5])
-    # hobs = np.array([1, 0.2, 0.6, 0.8, 0.9, 2])
+    
+    # xobs = np.array([])
+    # yobs = np.array([])
+    # zobs = np.array([])
+    # robs = np.array([])
+    # hobs = np.array([])
+    xobs = np.array([-1.8, -1, -0.5,    0,      0.5,    1.7,  0])*5
+    yobs = np.array([-1.8,  0,  1.5,    -0.5,   1.5,    -0.5, -2])*5
+    zobs = np.array([2,   1.8,    1,    0.5,    1.5,    1.3,  2])*5
+    robs = np.array([0.3, 0.1,  0.5,    0.2,    0.4,    0.5,  0.5])*5
+    # hobs = np.array([1,   0.2,  0.6,    0.8,    0.9,       2,  2])
+    hobs = np.array([2,   2,  2,   2,    2,    2,  2])*5
     nObs = len(xobs)
-    xmin = -2
-    xmax = 2
-    ymin = -2
-    ymax = 2
-    zmin = 0
-    zmax = 2
+    xmin = -2*5
+    xmax = 2*5
+    ymin = -2*5
+    ymax = 2*5
+    zmin = 0*5
+    zmax = 2*5
     # xs = np.array([1.5, 1.5, 1.5, 1.5])
     # ys = np.array([1.5, 0.5, -0.5, -1.5])
     # zs = np.array([0, 0, 0, 0])
-    xs = np.array([1])
-    ys = np.array([0])
-    zs = np.array([0])
+    xs = np.array([-1.5, -2, -1.5])*5
+    # xs = np.array([-1.5, -2, -1.5])
+    # ys = np.array([-1.7, -1.5, -1.5])
+    ys = np.array([-1.7, -1.5, -1.5])*5
+    # zs = np.array([0, 0, 0])
+    zs = np.array([0, 0, 0])*5
     # target_init = np.array([1.5, 0.0, 1.6])
     # xt = np.array([1.3, 1.5, 1.5, 1.0]) 
     # yt = np.array([0.0, 1.0, 0.0, 0.0]) 
     # zt = np.array([1.6, 1.6, 1.8, 2.0])  
-    xt = np.array([0])
-    yt = np.array([1.5])
-    zt = np.array([1.5])
+    xt = np.array([1.9, 1.7, 1.3])*5
+    # xt = np.array([1.9, 1.7, 1.6])
+    yt = np.array([1.5, 1.8, 1.1])*5
+    # yt = np.array([1.5, 1.8, 1.4])
+    zt = np.array([1.8, 1.5, 1.4])*5
+    # zt = np.array([1.8, 1.5, 1.2])
 
     Path_Generation.pso(xobs, yobs, zobs, robs, hobs, nObs, xmin, xmax, ymin, ymax, zmin, zmax, xs, ys, zs, xt, yt, zt)
 
