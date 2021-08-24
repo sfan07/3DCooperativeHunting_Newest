@@ -32,9 +32,9 @@ class model():
         self.zmin = []
         self.zmax = []
         self.obstBuffer = []
-        self.nUAVs = 1
+        self.nUAVs = 0
 
-    def update_param(self, xobs, yobs, zobs, robs, hobs, nobs, n, xmin, xmax, ymin, ymax, zmin, zmax, obstBuffer):
+    def update_param(self, xobs, yobs, zobs, robs, hobs, nobs, n, xmin, xmax, ymin, ymax, zmin, zmax, obstBuffer, xs, ys, zs, xt, yt, zt):
         self.xobs = xobs
         self.yobs = yobs
         self.zobs = zobs
@@ -49,6 +49,15 @@ class model():
         self.zmin = zmin
         self.zmax = zmax
         self.obstBuffer = obstBuffer
+        self.xs = xs
+        self.ys = ys
+        self.zs = zs
+        self.xt = xt
+        self.yt = yt
+        self.zt = zt
+        self.nUAVs = len(xs)
+
+
 
 class Position():
     def __init__(self):
@@ -100,7 +109,7 @@ class Best():
     def __init__(self):
         self.Position = Position()
         self.Velocity = Velocity()
-        self.Cost = []
+        self.Cost = math.inf
         self.PathLength = []
         self.Sol = sol2()
 
@@ -164,18 +173,17 @@ class sol2():
         sol2.IsFeasible = (sol2.Violation==0)
 
 class path_generation():
-
     '''
     input: 
-    nObs : number of obstacles in the environment
-    
+    obstacles profiles [x,y,z,h,r]
+    agent positions [xs,ys,zs]
+    target position [xt,yt,zt]
+    look_ahead_num: constant number
 
-
-
-    output:
-
-
+    output: 
+    waypoints [x,y,z]
     '''
+
     def __init__(self):
         self.model = model()
         #self.particle = empty_particle()
@@ -189,6 +197,7 @@ class path_generation():
         nPop = 150
         self.particle = np.matlib.repmat(self.empty_particle,nPop,1)
         self.GlobalBest = GlobalBest()
+        self.temp_particle = empty_particle()
         
 
         # self.pos = []
@@ -196,19 +205,25 @@ class path_generation():
         #self.fake_rad = []
         #self.height = []
 
-    def pso(self, nObs):
+    def pso(self, xobs, yobs, zobs, robs, hobs, nObs, xmin, xmax, ymin, ymax, zmin, zmax, xs, ys, zs, xt, yt, zt):
         '''
         This function generates path waypoints for agents
         '''
 
         droneSideLenght = 0.15
         obstBuffer = droneSideLenght*1.5
+        nUAVs = len(xs) #number of UAVs, check it
 
-        env = self.CreateModel(nObs, obstBuffer)
+        # Number of intermediate way points
+        n = math.ceil(nObs/5)*3
+
+        self.model.update_param(xobs, yobs, zobs, robs, hobs, nObs, n, xmin, xmax, ymin, ymax, zmin, zmax, obstBuffer, xs, ys, zs, xt, yt, zt)
+        env = self.model
+        # env = self.CreateModel(nObs, obstBuffer)
         
         #figure(1)
 
-        self.model = self.getGoals(env)
+        # self.model = self.getGoals(env)
 
         nVar = self.model.n # Number of Decision Variables
         VarSize = [1, nVar] # Size of Decision Variable Matrix
@@ -268,35 +283,41 @@ class path_generation():
             if i > 0:
                 self.particle[i][0].Position = self.CreateRandomSolution(self.model,self.particle[0][0].Position)
             else:
-                #straight line from source to destination
-                xx = np.linspace(self.model.xs,self.model.xt,self.model.n+2)
-                yy = np.linspace(self.model.ys,self.model.yt,self.model.n+2)
-                zz = np.linspace(self.model.zs,self.model.zt,self.model.n+2)
-                end = len(xx)
-                self.particle[i][0].Position.x = xx[1:-1]
-                end = len(yy)
-                self.particle[i][0].Position.y = yy[1:-1]
-                end = len(zz)
-                self.particle[i][0].Position.z = zz[1:-1]
+                for j in range(self.model.nUAVs):
+                    #straight line from source to destination
+                    xx = np.linspace(self.model.xs[j],self.model.xt[j],self.model.n+2)
+                    yy = np.linspace(self.model.ys[j],self.model.yt[j],self.model.n+2)
+                    zz = np.linspace(self.model.zs[j],self.model.zt[j],self.model.n+2)
+                    self.particle[i][0].Position.x.extend((xx[1:-1]).tolist()) 
+                    self.particle[i][0].Position.y.extend((yy[1:-1]).tolist())
+                    self.particle[i][0].Position.z.extend((zz[1:-1]).tolist())
+
             # Initialize Velocity
             # self.particle[i][0].Velocity.x = np.zeros(VarSize)
             # self.particle[i][0].Velocity.y = np.zeros(VarSize)
             # self.particle[i][0].Velocity.z = np.zeros(VarSize)
-            self.particle[i][0].Velocity.x = np.zeros((1,VarSize[1]))[0] #[[0.,0.,0.]][0] = [0,0,0]
-            self.particle[i][0].Velocity.y = np.zeros((1,VarSize[1]))[0]
-            self.particle[i][0].Velocity.z = np.zeros((1,VarSize[1]))[0]
-           
+            self.particle[i][0].Velocity.x = np.zeros((1,VarSize[1]*self.model.nUAVs))[0] #[[0.,0.,0.]][0] = [0,0,0]
+            self.particle[i][0].Velocity.y = np.zeros((1,VarSize[1]*self.model.nUAVs))[0]
+            self.particle[i][0].Velocity.z = np.zeros((1,VarSize[1]*self.model.nUAVs))[0]
+            # print(self.particle[i][0].Position.x)
+            # print(self.particle[i][0].Position.y)
+            # print(self.particle[i][0].Position.z)
             # Evaluation
             [self.particle[i][0].Cost, self.particle[i][0].PathLength, self.particle[i][0].Sol] = self.MyCost(self.particle[i][0].Position,self.model)
             #Update Personal Best
-            self.particle[i][0].Best.Position = self.particle[i][0].Position
-            self.particle[i][0].Best.Cost = self.particle[i][0].Cost
-            self.particle[i][0].Best.Sol = self.particle[i][0].Sol
-            self.particle[i][0].Best.PathLength = self.particle[i][0].PathLength
+            self.particle[i][0].Best.Position.x = self.particle[i][0].Position.x.copy()
+            self.particle[i][0].Best.Position.y = self.particle[i][0].Position.y.copy()
+            self.particle[i][0].Best.Position.z = self.particle[i][0].Position.z.copy()
+
+            self.particle[i][0].Best.Cost = self.particle[i][0].Cost.copy()
+            self.particle[i][0].Best.Sol = self.particle[i][0].Sol 
+            self.particle[i][0].Best.PathLength = self.particle[i][0].PathLength.copy()
+
             # Update Global Best
             if self.particle[i][0].Best.Cost < self.GlobalBest.Best.Cost:
                 self.GlobalBest.Best = self.particle[i][0].Best
 
+        # Array to hold best cost values at each iteration
         BestCost = np.zeros((self.MaxIt,1))
         BestPathLength = np.zeros((self.MaxIt,1))
 
@@ -307,8 +328,8 @@ class path_generation():
                 # x part
                 # update velocity
                 self.particle[i][0].Velocity.x = w*np.array(self.particle[i][0].Velocity.x) + \
-                    c1*np.multiply(np.random.rand(1,VarSize[1])[0],(np.array(self.particle[i][0].Best.Position.x)-np.array(self.particle[i][0].Position.x)))+ \
-                                                c2*np.multiply(np.random.rand(1,VarSize[1])[0],(np.array(self.GlobalBest.Best.Position.x)-np.array(self.particle[i][0].Position.x)))
+                    c1*np.multiply(np.random.rand(1,VarSize[1]*self.model.nUAVs)[0],(np.array(self.particle[i][0].Best.Position.x)-np.array(self.particle[i][0].Position.x)))+ \
+                                                c2*np.multiply(np.random.rand(1,VarSize[1]*self.model.nUAVs)[0],(np.array(self.GlobalBest.Best.Position.x)-np.array(self.particle[i][0].Position.x)))
 
                 # Update velocity bounds
                 self.particle[i][0].Velocity.x = np.maximum(self.particle[i][0].Velocity.x, self.VelMin.x)
@@ -320,7 +341,7 @@ class path_generation():
                 # OutofTheRange = (self.particle[i][0].Position.x < self.VarMin.x or self.particle[i][0].Position.x > self.VarMax.x)
                 OutofTheRange = (self.IsArr1Smaller(self.particle[i][0].Position.x, self.VarMin.x) or self.IsArr1Larger(self.particle[i][0].Position.x, self.VarMax.x))
                 if OutofTheRange == True:
-                    self.particle[i][0].Velocity.x = -self.particle[i][0].Velocity.x
+                    self.particle[i][0].Velocity.x = -self.particle[i][0].Velocity.x.copy()
 
                 # Update Position Bounds
                 self.particle[i][0].Position.x = np.maximum(self.particle[i][0].Position.x, self.VarMin.x)
@@ -329,8 +350,8 @@ class path_generation():
                 # y part
                  # update velocity
                 self.particle[i][0].Velocity.y = w*self.particle[i][0].Velocity.y + \
-                    c1*np.multiply(np.random.rand(1,VarSize[1])[0],(np.array(self.particle[i][0].Best.Position.y)-np.array(self.particle[i][0].Position.y)))+ \
-                        c2*np.multiply(np.random.rand(1,VarSize[1])[0],(np.array(self.GlobalBest.Best.Position.y)-np.array(self.particle[i][0].Position.y)))
+                    c1*np.multiply(np.random.rand(1,VarSize[1]*self.model.nUAVs)[0],(np.array(self.particle[i][0].Best.Position.y)-np.array(self.particle[i][0].Position.y)))+ \
+                        c2*np.multiply(np.random.rand(1,VarSize[1]*self.model.nUAVs)[0],(np.array(self.GlobalBest.Best.Position.y)-np.array(self.particle[i][0].Position.y)))
 
                 # Update velocity bounds
                 self.particle[i][0].Velocity.y = np.maximum(self.particle[i][0].Velocity.y, self.VelMin.y)
@@ -344,7 +365,7 @@ class path_generation():
 
                 # OutofTheRange = (self.particle[i][0].Position.y < self.VarMin.y or self.particle[i][0].Position.y > self.VarMax.y)
                 if OutofTheRange == True:
-                    self.particle[i][0].Velocity.y = -self.particle[i][0].Velocity.y
+                    self.particle[i][0].Velocity.y = -self.particle[i][0].Velocity.y.copy()
 
                 # Update Position Bounds
                 self.particle[i][0].Position.y = np.maximum(self.particle[i][0].Position.y, self.VarMin.y)
@@ -352,8 +373,8 @@ class path_generation():
                 # z Part
                 # update velocity
                 self.particle[i][0].Velocity.z = w*self.particle[i][0].Velocity.z + \
-                    c1*np.multiply(np.random.rand(1,VarSize[1])[0],(np.array(self.particle[i][0].Best.Position.z)-np.array(self.particle[i][0].Position.z)))+ \
-                        c2*np.multiply(np.random.rand(1,VarSize[1])[0],(np.array(self.GlobalBest.Best.Position.z)-np.array(self.particle[i][0].Position.z)))
+                    c1*np.multiply(np.random.rand(1,VarSize[1]*self.model.nUAVs)[0],(np.array(self.particle[i][0].Best.Position.z)-np.array(self.particle[i][0].Position.z)))+ \
+                        c2*np.multiply(np.random.rand(1,VarSize[1]*self.model.nUAVs)[0],(np.array(self.GlobalBest.Best.Position.z)-np.array(self.particle[i][0].Position.z)))
 
                 # Update velocity bounds
                 self.particle[i][0].Velocity.z = np.maximum(self.particle[i][0].Velocity.z, self.VelMin.z)
@@ -366,29 +387,41 @@ class path_generation():
                 # OutofTheRange = (self.particle[i][0].Position.z < self.VarMin.z or self.particle[i][0].Position.z > self.VarMax.z)
                 OutofTheRange = (self.IsArr1Smaller(self.particle[i][0].Position.z, self.VarMin.z) or self.IsArr1Larger(self.particle[i][0].Position.z, self.VarMax.z))
                 if OutofTheRange == True:
-                    self.particle[i][0].Velocity.z = -self.particle[i][0].Velocity.z
+                    self.particle[i][0].Velocity.z = -self.particle[i][0].Velocity.z.copy()
 
                 # Update Position Bounds
                 self.particle[i][0].Position.z = np.maximum(self.particle[i][0].Position.z, self.VarMin.z)
                 self.particle[i][0].Position.z = np.minimum(self.particle[i][0].Position.z, self.VarMax.z) 
+
+                # covert position and velocity to list
+                # self.particle[i][0].Position.x = self.particle[i][0].Position.x.tolist().copy()
+                self.temp_particle.Position.x = self.particle[i][0].Position.x.tolist().copy()
+                self.temp_particle.Position.y = self.particle[i][0].Position.y.tolist().copy()
+                self.temp_particle.Position.z = self.particle[i][0].Position.z.tolist().copy()
+                # self.particle[i][0].Position.y = self.particle[i][0].Position.y.tolist().copy()
+                # self.particle[i][0].Position.z = self.particle[i][0].Position.z.tolist().copy()
+                # self.particle[i][0].Velocity.x = self.particle[i][0].Velocity.x.tolist().copy()
+                # self.particle[i][0].Velocity.y = self.particle[i][0].Velocity.y.tolist().copy()
+                # self.particle[i][0].Velocity.z = self.particle[i][0].Velocity.z.tolist().copy()
                 
                 # Evaluation
-                [self.particle[i][0].Cost, self.particle[i][0].PathLength, self.particle[i][0].Sol] = self.MyCost(self.particle[i][0].Position, model_update)
+                [self.particle[i][0].Cost, self.particle[i][0].PathLength, self.particle[i][0].Sol] = self.MyCost(self.temp_particle.Position, model_update)
+                
                 # Update Personal Best
                 if (self.particle[i][0].Cost <self.particle[i][0].Best.Cost):
-                    self.particle[i][0].Best.Position = self.particle[i][0].Position
-                    self.particle[i][0].Best.Cost = self.particle[i][0].Cost
-                    self.particle[i][0].Best.Sol = self.particle[i][0].Sol #class sol2()
-                    self.particle[i][0].Best.PathLength = self.particle[i][0].PathLength
+                    self.particle[i][0].Best.Position = self.particle[i][0].Position.copy()
+                    self.particle[i][0].Best.Cost = self.particle[i][0].Cost.copy()
+                    self.particle[i][0].Best.Sol = self.particle[i][0].Sol.copy() #class sol2()
+                    self.particle[i][0].Best.PathLength = self.particle[i][0].PathLength.copy()
 
                     # Update Global Best
                     if self.particle[i][0].Best.Cost < self.GlobalBest.Best.Cost:
-                        self.GlobalBest.Best = self.particle[i][0].Best
+                        self.GlobalBest.Best = self.particle[i][0].Best.copy()
             
             # Update Best Cost Ever Found
-            BestCost[it] = self.GlobalBest.Best.Cost
+            BestCost[it] = self.GlobalBest.Best.Cost.copy()
             
-            BestPathLength[it] = self.GlobalBest.Best.PathLength
+            BestPathLength[it] = self.GlobalBest.Best.PathLength.copy()
 
             # Inertia Weight Damping
             w = w*wdamp
@@ -579,79 +612,120 @@ class path_generation():
 
     def ParseSolution(self, sol1, model):
 
-        x = sol1.x
-        y = sol1.y   
-        z = sol1.z 
-
-        xs = model.xs
-        ys = model.ys 
-        zs = model.zs 
-
-        xt = model.xt 
-        yt = model.yt
-        zt = model.zt
-
-        xobs = model.xobs
-        yobs = model.yobs
-        zobs = model.zobs
-        robs = model.robs
-        hobs = model.hobs
-
-        XS = x
-        XS = XS.tolist()
-        XS.insert(0,xs)
-        XS.append(xt)
-        #XS = [xs, x, xt]
-        YS = y
-        YS = YS.tolist()
-        YS.insert(0,ys)
-        YS.append(yt)
-        #YS = [ys, y, yt]
-        ZS = z
-        ZS = ZS.tolist()
-        ZS.insert(0,zs)
-        ZS.append(zt)
-        #ZS = [zs, z, zt] 
-        k = len(XS)
-        TS = np.linspace(0,1,k)
-
-        tt = np.linspace(0,1,100)
-
-        spl_xx = InterpolatedUnivariateSpline(TS, XS)
-        xx = spl_xx(tt)
-        spl_yy = InterpolatedUnivariateSpline(TS, YS)
-        yy = spl_yy(tt)
-        spl_zz = InterpolatedUnivariateSpline(TS, ZS)
-        zz = spl_zz(tt)
-      
-        dx = np.diff(xx)
-        dy = np.diff(yy)
-        dz = np.diff(zz)
-
-        L = sum(np.sqrt(np.square(dx)+np.square(dy)+np.square(dz)))
-
-        nobs = len(xobs) # number of obstacles
-        n = len(xx) # number of points to be seperated
+        nUAVs = model.nUAVs
+        nVar = model.n
         Violation = 0
+        XS = []
+        YS = []
+        ZS = []
+        L = 0
+        temp_xx = []
+        temp_yy = []
+        temp_zz = []
 
-        for k in range(nobs):
+        xobs = model.xobs.tolist()
+        yobs = model.yobs.tolist()
+        zobs = model.zobs.tolist()
+        robs = model.robs.tolist()
+        hobs = model.hobs.tolist()
 
-            xx_filtered = []
-            yy_filtered = []
-            zz_filtered = []
+        for i in range(nUAVs):
 
-            for j in range(n):
-                if(zz[j] <= zobs[k]) and (zz[j] >= zobs[k]-hobs[k]):
-                    xx_filtered.append(xx[j])
-                    yy_filtered.append(yy[j])
-                    zz_filtered.append(zz[j])
-            d = np.sqrt(np.square(xx_filtered-xobs[k]) + np.square(yy_filtered-yobs[k]))
-            temp = 1-d/robs[k]
-            zero_array = np.zeros_like(temp)
-            v = np.maximum(temp,zero_array)
-            Violation = Violation + np.mean(v)
-        
-        self.sol2.update_param(TS, XS, YS, ZS, tt, xx, yy, zz, dx, dy, dz, L, Violation)
+            x = sol1.x[(nVar*i):(nVar*i+nVar)]
+            y = sol1.y[(nVar*i):(nVar*i+nVar)]
+            z = sol1.z[(nVar*i):(nVar*i+nVar)] 
+
+            xs = model.xs[i]
+            ys = model.ys[i]
+            zs = model.zs[i]
+
+            xt = model.xt[i]
+            yt = model.yt[i]
+            zt = model.zt[i]
+
+            kOld = len(XS)
+            #print(kOld)
+
+            x_temp = x.copy()
+            x_temp.insert(0,xs)
+            x_temp.append(xt)
+            XS.extend(x_temp)
+            #XS = [XS, xs, x, xt]
+
+            y_temp = y.copy()
+            y_temp.insert(0,ys)
+            y_temp.append(yt)
+            YS.extend(y_temp)
+            #YS = [YS, ys, y, yt]
+
+            z_temp = z.copy()
+            z_temp.insert(0,zs)
+            z_temp.append(zt)
+            ZS.extend(z_temp)
+            #ZS = [ZS, zs, z, zt] 
+            
+            k = len(XS)-kOld
+
+            TS = np.linspace(0,1,k)
+
+            tt = np.linspace(0,1,100)
+            temp_xx2 = x.copy()
+            temp_xx2.insert(0,xs)
+            temp_xx2.append(xt)
+            # temp_xx2 = [xs, x, xt]
+            spl_xx = InterpolatedUnivariateSpline(TS, temp_xx2)
+            xx = spl_xx(tt)
+
+            temp_yy2 = y.copy()
+            temp_yy2.insert(0,ys)
+            temp_yy2.append(yt)
+            # temp_yy2 = [ys, y, yt]
+            spl_yy = InterpolatedUnivariateSpline(TS, temp_yy2)
+            yy = spl_yy(tt)
+            temp_zz2 = z.copy()
+            temp_zz2.insert(0,zs)
+            temp_zz2.append(zt)
+            # temp_zz2 = [zs, z, zt]
+            spl_zz = InterpolatedUnivariateSpline(TS, temp_zz2)
+            zz = spl_zz(tt)
+      
+            dx = np.diff(xx)
+            dy = np.diff(yy)
+            dz = np.diff(zz)
+
+            temp_xx.extend(xx.tolist())
+            temp_yy.extend(yy.tolist())
+            temp_zz.extend(zz.tolist())
+
+            L = L+ sum(np.sqrt(np.square(dx)+np.square(dy)+np.square(dz)))
+
+            nobs = len(xobs) # number of obstacles
+            n = len(xx) # number of points to be seperated
+
+            for k in range(nobs):
+
+                xx_filtered = []
+                yy_filtered = []
+                zz_filtered = []
+
+                for j in range(n):
+                    if(zz[j] <= zobs[k]) and (zz[j] >= zobs[k]-hobs[k]):
+                        xx_filtered.append(xx[j])
+                        yy_filtered.append(yy[j])
+                        zz_filtered.append(zz[j])
+                d = np.sqrt(np.square(np.array(xx_filtered)-np.array(xobs)[k]) + np.square(np.array(yy_filtered)-yobs[k]))
+                temp = 1-d/robs[k]
+                zero_array = np.zeros_like(temp)
+                v = np.maximum(temp,zero_array)
+                Violation = Violation + np.mean(v)
+            xobs.extend(xx.tolist()[9:90])
+            yobs.extend(yy.tolist()[9:90])
+            zobs.extend((zz[9:90]+(self.model.obstBuffer+0.15)).tolist())
+            robs.extend((self.model.obstBuffer+0.15)*np.ones(81))
+            hobs.extend((self.model.obstBuffer+0.15)*2*np.ones(81))
+
+
+        self.sol2.update_param(TS, XS, YS, ZS, tt, temp_xx, temp_yy, temp_zz, dx, dy, dz, L, Violation)
         sol = self.sol2
 
         return sol
@@ -837,17 +911,32 @@ class path_generation():
         return val
 
     def CreateRandomSolution(self, model, position):
+        # print(model.xs-model.xt)
+        dist = np.zeros(4)
+        sigma = np.zeros(4)
+        x = []
+        y = []
+        z = []
+        for k in range(model.nUAVs):
+            dist[k] = math.sqrt((model.xs[k]-model.xt[k])**2+(model.ys[k]-model.yt[k])**2+(model.zs[k]-model.zt[k])**2)
 
-        dist = math.sqrt((self.model.xs-self.model.xt)**2+(self.model.ys-self.model.yt)**2+(self.model.zs-self.model.zt)**2)
-        sigma = (dist/(self.model.n+1))/2
-        self.sol1.x = np.random.normal(position.x, sigma)
-        self.sol1.y = np.random.normal(position.y, sigma)
-        self.sol1.z = np.random.normal(position.z, sigma)
+            sigma[k] = (dist[k]/(model.n+1))/2
+            temp_x = np.random.normal(position.x[(k*model.n):((k+1)*model.n)], sigma[k])
+            x.extend(temp_x.tolist())
+            temp_y = np.random.normal(position.y[(k*model.n):((k+1)*model.n)], sigma[k])
+            y.extend(temp_y.tolist())
+            temp_z = np.random.normal(position.z[(k*model.n):((k+1)*model.n)], sigma[k])
+            z.extend(temp_z.tolist())
+
+        self.sol1.x = x.copy()
+        self.sol1.y = y.copy()
+        self.sol1.z = z.copy()
         sol = self.sol1
         return sol
 
 
     def MyCost(self, sol1, model):
+        # print(sol1)
         sol = self.ParseSolution(sol1,model) #class sol2()
         beta = 10
         z = sol.L*(1+beta*sol.Violation)
@@ -894,7 +983,7 @@ class path_generation():
         zs = 0
         model.zs = zs
         #self.ax.plot3D(xs,ys,zs)]
-        plt.scatter(xs,ys)
+        plt.scatter(xs,ys,marker='*')
         #self.ax.plot3D(xs,ys,zs,'bs','MarkerSize',16,'MarkerFaceColor','y')
         # model.xt = input("Please enter the goal position x:\n")
         # model.yt = input("Please enter the goal position y:\n")
@@ -903,11 +992,12 @@ class path_generation():
         model.xt,model.yt = temp_t[0]
         xt = model.xt
         yt = model.yt
-        zt = random.random()*(model.zmax-model.zmin)+model.zmin
+        # zt = random.random()*(model.zmax-model.zmin)+model.zmin
+        zt = 1.6
         model.zt = zt
         #zt = model.zt
         #self.ax.plot3D(xt,yt,zt)
-        plt.scatter(xt,yt)
+        plt.scatter(xt,yt,marker='o')
         #self.ax.plot3D(xt,yt,zt,'kp','MarkerSize',16,'MarkerFaceColor','g')
 
         plt.show()
@@ -922,7 +1012,27 @@ class path_generation():
 if __name__ == '__main__':
     random.seed(1)
     Path_Generation = path_generation()
-    Path_Generation.pso(5)
+    xobs = np.array([-1.8, -1, -0.5, 0, 0.5, 1.7])
+    yobs = np.array([-1.8, 0, 1.5, -0.5, 1.5, -0.5])
+    zobs = np.array([2, 1.8, 1, 0.5, 1.5, 1.3])
+    robs = np.array([0.3, 0.1, 0.5, 0.2, 0.4, 0.5])
+    hobs = np.array([1, 0.2, 0.6, 0.8, 0.9, 2])
+    nObs = len(xobs)
+    xmin = -2
+    xmax = 2
+    ymin = -2
+    ymax = 2
+    zmin = 0
+    zmax = 2
+    xs = np.array([1.5, -1.5, 1.5, -1.5])
+    ys = np.array([1.5, 1.5, -1.5, -1.5])
+    zs = np.array([0, 0, 0, 0])
+    target_init = np.array([1.5, 0.0, 1.6])
+    xt = np.array([1.3, 1.5, 1.5, 1.0]) 
+    yt = np.array([0.0, 1.0, 0.0, 0.0]) 
+    zt = np.array([1.6, 1.6, 1.8, 2.0])  
+
+    Path_Generation.pso(xobs, yobs, zobs, robs, hobs, nObs, xmin, xmax, ymin, ymax, zmin, zmax, xs, ys, zs, xt, yt, zt)
 
 
 
