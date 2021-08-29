@@ -217,7 +217,8 @@ class path_generation():
         nUAVs = len(xs) 
 
         # Number of intermediate way points
-        n = max(math.ceil(nObs/5)*3, 3)
+        # n = max(math.ceil(nObs/5)*3, 3)
+        n = 3
 
         self.model.update_param(xobs, yobs, zobs, robs, hobs, nObs, n, xmin, xmax, ymin, ymax, zmin, zmax, obstBuffer, xs, ys, zs, xt, yt, zt)
         env = self.model
@@ -239,13 +240,13 @@ class path_generation():
         self.VarMax.z = self.model.zmax
 
         P_reloc_obs = 0.6 # Relocation probability of obstacles
-        Maxstep_reloc_obs = 0.1 # max step obstacles are relocated from their current positions (assume moving on xy plane)
+        Maxstep_reloc_obs = 1 # max step obstacles are relocated from their current positions (assume moving on xy plane)
         P_reloc_t = 0 # Relocation probability of target
 
         '''
         PSO Parameters
         '''
-        self.MaxIt = 100 # Maximum Number of Iterations
+        self.MaxIt = 2 # Maximum Number of Iterations
         time = np.zeros((1,self.MaxIt))
         nPop = 150 # population size (swarm size)
         w = 1 # inertia weight
@@ -453,24 +454,28 @@ class path_generation():
             print ("Iteration " + str(it) + ": Best Cost = " + str(BestCost[it]) + str(Flag))
 
             #figure(1)
-            self.PlotSolution(self.GlobalBest.Sol, model_update,it)
+            # self.PlotSolution(self.GlobalBest.Sol, model_update,it)
 
             # update target info and obstacles info in model
             # obstacles are moving at various velocities at various directions
-
+            '''
             for obstacle_No in range(model_update.nobs):
                 ran = random.random()
                 if ran <= P_reloc_obs:
-                    step_obs = random.random()*(-ran)
+                    step_obs = random.uniform(-1.0, 1.0)
                     model_update.xobs[obstacle_No] = model_update.xobs[obstacle_No] + Maxstep_reloc_obs*step_obs
                 ran = random.random()
                 if ran <= P_reloc_obs:
-                    step_obs = random.random()*(-ran)
+                    step_obs = random.uniform(-1.0, 1.0)
                     model_update.yobs[obstacle_No] = model_update.yobs[obstacle_No] + Maxstep_reloc_obs*step_obs
                 ran = random.random()
                 if ran <= P_reloc_obs:
-                    step_obs = random.random()*(-ran)
+                    step_obs = random.uniform(-1.0, 1.0)
                     model_update.zobs[obstacle_No] = model_update.zobs[obstacle_No] + Maxstep_reloc_obs*step_obs 
+            '''
+        
+        print('find best trajectory')
+        return self.GlobalBest, model_update
     
     def IsArr1larger(self,arr1,arr2):
         count = 0
