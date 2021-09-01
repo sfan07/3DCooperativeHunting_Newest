@@ -219,6 +219,10 @@ class path_generation():
         # Number of intermediate way points
         # n = max(math.ceil(nObs/5)*3, 3)
         n = 3
+        travel_dis = ((xs-xt)**2+(ys-yt)**2+(zs-zt)**2)**(0.5)
+        print('travel_dis',travel_dis)
+        # if min(travel_dis) < 0.6:
+        #     n = 1
 
         self.model.update_param(xobs, yobs, zobs, robs, hobs, nObs, n, xmin, xmax, ymin, ymax, zmin, zmax, obstBuffer, xs, ys, zs, xt, yt, zt)
         env = self.model
@@ -246,7 +250,7 @@ class path_generation():
         '''
         PSO Parameters
         '''
-        self.MaxIt = 2 # Maximum Number of Iterations
+        self.MaxIt = 10 # Maximum Number of Iterations
         time = np.zeros((1,self.MaxIt))
         nPop = 150 # population size (swarm size)
         w = 1 # inertia weight
@@ -317,13 +321,13 @@ class path_generation():
             self.particle[i][0].Best.Position.z = self.particle[i][0].Position.z.copy()
 
             self.particle[i][0].Best.Cost = self.particle[i][0].Cost.copy()
-            self.particle[i][0].Best.Sol = self.particle[i][0].Sol 
+            self.particle[i][0].Best.Sol =  copy.deepcopy(self.particle[i][0].Sol)
             self.particle[i][0].Best.PathLength = self.particle[i][0].PathLength.copy()
 
             # Update Global Best
             if self.particle[i][0].Best.Cost < self.GlobalBest.Best.Cost:
                 self.GlobalBest.Best = copy.deepcopy(self.particle[i][0].Best)
-                print('self.GlobalBest.Best.Cost at initilization ',self.GlobalBest.Best.Cost)
+                # print('self.GlobalBest.Best.Cost at initilization ',self.GlobalBest.Best.Cost)
 
         # Array to hold best cost values at each iteration
         BestCost = np.zeros((self.MaxIt,1))
@@ -434,9 +438,9 @@ class path_generation():
 
                     # Update Global Best
                     if self.particle[i][0].Best.Cost < self.GlobalBest.Best.Cost:
-                        print('self.particle[i][0].Best.Cost ',self.particle[i][0].Best.Cost)
+                        # print('self.particle[i][0].Best.Cost ',self.particle[i][0].Best.Cost)
                         self.GlobalBest.Best = copy.deepcopy(self.particle[i][0].Best)
-                        print('self.GlobalBest.Best.Cost after iteration',self.GlobalBest.Best.Cost)
+                        # print('self.GlobalBest.Best.Cost after iteration',self.GlobalBest.Best.Cost)
             
             # Update Best Cost Ever Found
             BestCost[it] = self.GlobalBest.Best.Cost.copy()
