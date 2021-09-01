@@ -153,7 +153,7 @@ class Sim2D():
                     print('COLLISION OCCUR!')
                     print('Current Agent Position', self.agent_state[:,:3])
                     exit()
-                    
+
 
     def step(self, agent_input, target_input, obs_input, return_copy = True):
         '''
@@ -226,7 +226,7 @@ class Sim2D():
         look_ahead_dt: dt for spline interpolation
         '''
         # augment agent and target state with height
-        self.agent_pos = np.hstack((self.agent_state.T[:,:2], np.zeros((4,1)))) # [x,y,0]
+        self.agent_pos = np.hstack((self.agent_state.T[:,:2], np.zeros((self.num_agents,1)))) # [x,y,0]
         self.target_pos = np.hstack((self.target_init.T[:2], h)) #[x,y,height of target]
 
         # get vertex position and vectors
@@ -257,8 +257,7 @@ class Sim2D():
                 error_state = np.zeros((6, self.num_agents))
             agent_input = np.zeros((2, self.num_agents))
 
-            self.agent_pos = np.hstack((self.agent_state.T[:,:2], self.agent_h[:, 0].reshape((4, 1))))
-
+            self.agent_pos = np.hstack((self.agent_state.T[:,:2], self.agent_h[:, 0].reshape((self.num_agents, 1))))
 
             #for spline interpolation
             ts = np.zeros((self.look_ahead_num, self.num_agents))
@@ -301,9 +300,9 @@ class Sim2D():
             self.Path_Generation = path_generation()
             GlobalBest, model_update = self.Path_Generation.pso(self.xobs, self.yobs, self.zobs, self.robs, self.hobs, len(self.xobs), -2, 2, -2, 2, 0, 2, self.agent_posx, self.agent_posy, self.agent_posz, self.target_posx, self.target_posy, self.target_posz)
             ## Generated waypoints
-            xx = GlobalBest.Sol.xx
-            yy = GlobalBest.Sol.yy
-            zz = GlobalBest.Sol.zz
+            xx = GlobalBest.Best.Sol.xx
+            yy = GlobalBest.Best.Sol.yy
+            zz = GlobalBest.Best.Sol.zz
 
                 # axis = normalize(np.cross(self.agent_vec, self.assigned_vertex_vec), axis = 1, norm = 'l2')    
                 # d_agent_target = norm(look_ahead_pts[n]-self.target_pos, axis = 1)
@@ -317,7 +316,7 @@ class Sim2D():
                     # C = self.rotation_from_axis_angle(axis[j], 0.02*angular_diff[j])
                     # v = C@self.agent_vec[j]/norm(C@self.agent_vec[j])
                     # waypoint = self.target_pos+(d_vertex_target[j]+0.98*radial_diff[j])*v
-                    waypoint = np.array([xx[n+j*100],yy[n+j*100],zz[n+j*100]])
+                    waypoint = np.array([xx[5*n+j*100],yy[10*n+j*100],zz[10*n+j*100]])
                     # clip the height to be between 0.1m and 2.0m
                     # waypoint[-1] = np.clip(waypoint[-1], 0.1, 2.0)
                     # populates look ahead points to be interpolated
@@ -380,7 +379,19 @@ class Sim2D():
             error_state = self.agent_state-ref_state
             agent_input += self.K@error_state
             self.agent_state, self.target_state, self.obs_state = self.step(agent_input, None, None)
-            print('A new iteration')
+            reach_no = 0
+
+            for k in range(self.num_agents):
+                print(norm(self.agent_pos[k,:3]-self.assigned_vertex_pos[k,:3]))
+                if(norm(self.agent_pos[k,:3]-self.assigned_vertex_pos[k,:3])<=0.1):
+                    self.reached[k] = True
+                    reach_no += 1
+            print('A new iteration',i)
+            print(self.reached)  
+
+            if reach_no == self.num_agents:
+                break
+
         self.vis()
         
     def get_dw_acc(self, dw_flag, acc_xyz, neighbors_pos, agent_coord, agent_input):
@@ -427,10 +438,39 @@ class Sim2D():
             
         for i in range (self.num_agents):
             ax.scatter(self.agent_coords[i, :, 0], self.agent_coords[i, :, 1], self.agent_coords[i, :, 2], s = 3, label = 'agent'+str(i))
-             
+        for k in range(len(self.xobs)):
+            # axis and radius
+            p1 = np.array([self.xobs[k], self.yobs[k], self.zobs[k]])
+            # vector in direction of axis
+            v = np.array([0,0,self.hobs[k]])
+            p0 = p1-v
+            R = self.robs[k]
+            # find magnitude of vector
+            mag = norm(v)
+            # unit vector in direction of axis
+            v = v/mag
+            # make some vector not in the same direction as v
+            not_v = np.array([1,0,0])
+            if (v==not_v).all():
+                not_v = np.array([0,1,0])
+            # make unit vector perpendicular to v
+            n1 = np.cross(v,not_v)
+            # normalize n1
+            n1 /= norm(n1)
+            # make unit vector perpendicular to v and n1
+            n2 = np.cross(v,n1)
+            #surface ranges over t from 0 to length of axis and 0 to 2*pi
+            t = np.linspace(0,mag,100)
+            theta = np.linspace(0,2*np.pi,50) #divide the circle into 50 equal parts
+            # use meshgrid to make 2d arrays
+            t, theta = np.meshgrid(t,theta)
+            # generate coordinates for surface
+            X, Y, Z = [p0[i] + v[i] * t + R * np.sin(theta) * n1[i] + R * np.cos(theta) * n2[i] for i in [0, 1, 2]]
+            ax.plot_surface(X, Y, Z)
+            ax.plot(*zip(p0, p1), color = 'red')
         ax.legend()
         plt.show()
-        fig.savefig("sim_3D_static_target",dpi = 300)
+        fig.savefig("sim_3D_static_target_4agents_3_obstacles",dpi = 300)
 
 if __name__ == '__main__':
     np.random.seed(1)
@@ -440,7 +480,8 @@ if __name__ == '__main__':
     if order == 2:
         agent_init = np.zeros((8, 4)) 
     elif order == 1:
-        agent_init = np.zeros((6, 4)) 
+        # agent_init = np.zeros((6, 1)) #case 0 : single agent-single target-no obstacle
+        agent_init = np.zeros((6, 4)) #case 1: 4 agents-single target-no obstacle
 
     # agent_init[:2, 0] = -1.5, 0.3
     # agent_init[:2, 1] = -1.5, 0.0
@@ -452,29 +493,31 @@ if __name__ == '__main__':
     # agent_init[:2, 2] = -1.4, 0.0
     # agent_init[:2, 3] = -1.6, 0.0
 
-    agent_init[:2, 0] =  1.5, 1.5
+    agent_init[:2, 0] =  1.5, 1.5 #case 0
     agent_init[:2, 1] = -1.5, 1.5
     agent_init[:2, 2] =  1.5, -1.5
     agent_init[:2, 3] = -1.0, -1.0
 
     target_init = np.array([1.0, 0.5, 0.0, 0.0]).T
 
-    obs_init = np.zeros((7,7)) #[xobs, yobs, zobs, robs, hobs, vx, vy]*7
-    obs_init[:5,0] = -1.8, -1.8,    2, 0.3, 2 
-    obs_init[:5,1] =   -1,    0,  1.8, 0.1, 2
-    obs_init[:5,2] = -0.5,  1.5,    1, 0.5, 2
-    obs_init[:5,3] =    0, -0.5,  0.5, 0.2, 2
-    obs_init[:5,4] =  0.5,  1.5,  1.5, 0.4, 2
-    obs_init[:5,5] =  1.7, -0.5,  1.3, 0.5, 2
-    obs_init[:5,6] =    0,   -2,    2, 0.5, 2
-
+    # obs_init = np.zeros((7,7)) #[xobs, yobs, zobs, robs, hobs, vx, vy]*7
+    # obs_init[:5,0] = -1.8, -1.8,    2, 0.3, 2 
+    # obs_init[:5,1] =   -1,    0,  1.8, 0.1, 2
+    # obs_init[:5,2] = -0.5,  1.5,    1, 0.5, 2
+    # obs_init[:5,3] =    0, -0.5,  0.5, 0.2, 2
+    # obs_init[:5,4] =  0.5,  1.5,  1.5, 0.4, 2
+    # obs_init[:5,5] =  1.7, -0.5,  1.3, 0.5, 2
+    # obs_init[:5,6] =    0,   -2,    2, 0.5, 2
+    obs_init = np.zeros((7,1)) #case 0
+    obs_init[:5,0] = -1.8, -1.8,    2, 0.3, 2 #case 0
     # nObs = obs_init.shape[1]
     # print(nObs)
 
     xmin, xmax = -2, 2
     ymin, ymax = -2, 2
     zmin, zmax = 0, 2
-    
-    sim_2D = Sim2D(agent_init, target_init, obs_init, num_iter = 1700, dt = 0.01, order = order)
+
+    sim_2D = Sim2D(agent_init, target_init, obs_init, num_iter = 300, dt = 0.01, order = order)
+    # sim_2D = Sim2D(agent_init, target_init, obs_init, num_iter = 1700, dt = 0.01, order = order)
     
     sim_2D.run()
