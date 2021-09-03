@@ -17,6 +17,7 @@ from scipy.interpolate import interp1d
 import numpy.matlib
 import random
 import copy
+import timeit
 
 class model():
     def __init__(self):
@@ -111,7 +112,8 @@ class Best():
     def __init__(self):
         self.Position = Position()
         self.Velocity = Velocity()
-        self.Cost = math.inf
+        # self.Cost = math.inf
+        self.Cost = np.Inf
         self.PathLength = []
         self.Sol = sol2()
 
@@ -126,7 +128,8 @@ class empty_particle():
 
 class GlobalBest():
     def __init__(self):
-        self.Cost = math.inf
+        # self.Cost = math.inf
+        self.Cost = np.Inf 
         self.PathLength = []
         self.Best = Best()
         self.Position = Position()
@@ -250,7 +253,7 @@ class path_generation():
         '''
         PSO Parameters
         '''
-        self.MaxIt = 10 # Maximum Number of Iterations
+        self.MaxIt = 20 # Maximum Number of Iterations
         time = np.zeros((1,self.MaxIt))
         nPop = 150 # population size (swarm size)
         w = 1 # inertia weight
@@ -266,21 +269,9 @@ class path_generation():
         self.VelMax.z =  alpha*(self.VarMax.z-self.VarMin.z) # Maximum Velocity
         self.VelMin.z = -self.VelMax.z                # Minimum Velocity        
         
-        '''
-        empty_particle.Position = []
-        empty_particle.Velocity = []
-        empty_particle.Cost = []
-        empty_particle.PathLength = []
-        empty_particle.Sol = []
-        empty_particle.Best.Position = []
-        empty_particle.Best.Cost = []
-        empty_particle.Best.Sol = []
-        empty_particle.Best.PathLength = []
-        '''
-
         # Initialize Global Best
-        self.GlobalBest.Best.Cost = math.inf
-        # GlobalBest.Cost = math.inf
+        # self.GlobalBest.Best.Cost = math.inf
+        self.GlobalBest.Best.Cost = np.Inf
 
         # Create Particles Matrix
         # self.particle = np.matlib.repmat(self.empty_particle,nPop,1)
@@ -304,15 +295,9 @@ class path_generation():
                     # print('self.particle[i][0].Position.z',self.particle[i][0].Position.z) 
 
             # Initialize Velocity
-            # self.particle[i][0].Velocity.x = np.zeros(VarSize)
-            # self.particle[i][0].Velocity.y = np.zeros(VarSize)
-            # self.particle[i][0].Velocity.z = np.zeros(VarSize)
             self.particle[i][0].Velocity.x = np.zeros((1,VarSize[1]*self.model.nUAVs))[0] #[[0.,0.,0.]][0] = [0,0,0]
             self.particle[i][0].Velocity.y = np.zeros((1,VarSize[1]*self.model.nUAVs))[0]
             self.particle[i][0].Velocity.z = np.zeros((1,VarSize[1]*self.model.nUAVs))[0]
-            # print(self.particle[i][0].Position.x)
-            # print(self.particle[i][0].Position.y)
-            # print(self.particle[i][0].Position.z)
             # Evaluation
             [self.particle[i][0].Cost, self.particle[i][0].PathLength, self.particle[i][0].Sol] = self.MyCost(self.particle[i][0].Position,self.model)
             #Update Personal Best
@@ -327,7 +312,6 @@ class path_generation():
             # Update Global Best
             if self.particle[i][0].Best.Cost < self.GlobalBest.Best.Cost:
                 self.GlobalBest.Best = copy.deepcopy(self.particle[i][0].Best)
-                # print('self.GlobalBest.Best.Cost at initilization ',self.GlobalBest.Best.Cost)
 
         # Array to hold best cost values at each iteration
         BestCost = np.zeros((self.MaxIt,1))
@@ -337,7 +321,6 @@ class path_generation():
         model_update = self.model
         for it in range(self.MaxIt):
             for i in range(nPop):
-                # print(i)
                 # x part
                 # update velocity
                 self.particle[i][0].Velocity.x = w*np.array(self.particle[i][0].Velocity.x) + \
@@ -351,7 +334,6 @@ class path_generation():
                 # Update Position
                 self.particle[i][0].Position.x = self.particle[i][0].Position.x + self.particle[i][0].Velocity.x
                 # Velocity Mirroring
-                # OutofTheRange = (self.particle[i][0].Position.x < self.VarMin.x or self.particle[i][0].Position.x > self.VarMax.x)
                 OutofTheRange = (self.IsArr1Smaller(self.particle[i][0].Position.x, self.VarMin.x) or self.IsArr1Larger(self.particle[i][0].Position.x, self.VarMax.x))
                 if OutofTheRange == True:
                     self.particle[i][0].Velocity.x = -self.particle[i][0].Velocity.x
@@ -359,8 +341,6 @@ class path_generation():
                 # Update Position Bounds
                 self.particle[i][0].Position.x = np.maximum(self.particle[i][0].Position.x, self.VarMin.x)
                 self.particle[i][0].Position.x = np.minimum(self.particle[i][0].Position.x, self.VarMax.x)
-                # print(self.particle[i][0].Position.x)
-                # print(self.particle[i][0].Velocity.x)
 
                 # y part
                  # update velocity
@@ -400,7 +380,6 @@ class path_generation():
                 self.particle[i][0].Position.z = self.particle[i][0].Position.z + self.particle[i][0].Velocity.z           
                 
                 # Velocity Mirroring
-                # OutofTheRange = (self.particle[i][0].Position.z < self.VarMin.z or self.particle[i][0].Position.z > self.VarMax.z)
                 OutofTheRange = (self.IsArr1Smaller(self.particle[i][0].Position.z, self.VarMin.z) or self.IsArr1Larger(self.particle[i][0].Position.z, self.VarMax.z))
                 if OutofTheRange == True:
                     self.particle[i][0].Velocity.z = -self.particle[i][0].Velocity.z
@@ -410,37 +389,19 @@ class path_generation():
                 self.particle[i][0].Position.z = np.minimum(self.particle[i][0].Position.z, self.VarMax.z) 
 
                 # covert position and velocity to list
-                # self.particle[i][0].Position.x = self.particle[i][0].Position.x.tolist().copy()
                 self.temp_particle.Position.x = self.particle[i][0].Position.x.tolist().copy()
                 self.temp_particle.Position.y = self.particle[i][0].Position.y.tolist().copy()
                 self.temp_particle.Position.z = self.particle[i][0].Position.z.tolist().copy()
-                # self.particle[i][0].Position.y = self.particle[i][0].Position.y.tolist().copy()
-                # self.particle[i][0].Position.z = self.particle[i][0].Position.z.tolist().copy()
-                # self.particle[i][0].Velocity.x = self.particle[i][0].Velocity.x.tolist().copy()
-                # self.particle[i][0].Velocity.y = self.particle[i][0].Velocity.y.tolist().copy()
-                # self.particle[i][0].Velocity.z = self.particle[i][0].Velocity.z.tolist().copy()
-                
+
                 # Evaluation
                 [self.particle[i][0].Cost, self.particle[i][0].PathLength, self.particle[i][0].Sol] = self.MyCost(self.temp_particle.Position, model_update)
                 
                 # Update Personal Best
                 if (self.particle[i][0].Cost <self.particle[i][0].Best.Cost):
-                    # print(self.particle[i][0].Cost)
                     self.particle[i][0].Best = copy.deepcopy(self.particle[i][0])
-                    # self.particle[i][0].Best.Position.x = self.particle[i][0].Position.x.copy()
-                    # self.particle[i][0].Best.Position.y = self.particle[i][0].Position.y.copy()
-                    # self.particle[i][0].Best.Position.z = self.particle[i][0].Position.z.copy()
-                    # self.particle[i][0].Best.Cost = self.particle[i][0].Cost.copy()
-                    # self.particle[i][0].Best.Sol = self.particle[i][0].Sol.copy() #class sol2()
-                    # self.particle[i][0].Best.PathLength = self.particle[i][0].PathLength.copy()
-                    
-                    # print('self.GlobalBest.Best.Cost at initilization ',self.GlobalBest.Best.Cost)
-
                     # Update Global Best
                     if self.particle[i][0].Best.Cost < self.GlobalBest.Best.Cost:
-                        # print('self.particle[i][0].Best.Cost ',self.particle[i][0].Best.Cost)
                         self.GlobalBest.Best = copy.deepcopy(self.particle[i][0].Best)
-                        # print('self.GlobalBest.Best.Cost after iteration',self.GlobalBest.Best.Cost)
             
             # Update Best Cost Ever Found
             BestCost[it] = self.GlobalBest.Best.Cost.copy()
@@ -478,7 +439,7 @@ class path_generation():
                     model_update.zobs[obstacle_No] = model_update.zobs[obstacle_No] + Maxstep_reloc_obs*step_obs 
             '''
         
-        print('find best trajectory')
+        # print('find best trajectory')
         return self.GlobalBest, model_update
     
     def IsArr1larger(self,arr1,arr2):
@@ -769,23 +730,6 @@ class path_generation():
 
         return sol
 
-        '''
-        self.sol2.TS = TS
-        self.sol2.XS = XS
-        self.sol2.YS = YS
-        self.sol2.ZS = ZS
-        self.sol2.tt = tt
-        self.sol2.xx = xx
-        self.sol2.yy = yy
-        self.sol2.zz = zz
-        self.sol2.dx = dx
-        self.sol2.dy = dy
-        self.sol2.dz = dz
-        self.sol2.L = L 
-        self.sol2.Violation = Violation
-        self.sol2.IsFeasible = (self.sol2.Violation==0)
-        '''
-
     def CreateModel(self, nObs, obstBuffer):
         '''
         This function generates a random static environment with circular
@@ -1024,43 +968,26 @@ class path_generation():
         ys = model.ys
         zs = 0
         model.zs = zs
-        #self.ax.plot3D(xs,ys,zs)]
         plt.scatter(xs,ys,marker='*')
-        #self.ax.plot3D(xs,ys,zs,'bs','MarkerSize',16,'MarkerFaceColor','y')
-        # model.xt = input("Please enter the goal position x:\n")
-        # model.yt = input("Please enter the goal position y:\n")
-        # model.zt = input("Please enter the goal position z:\n")
         temp_t = plt.ginput(1)
         model.xt,model.yt = temp_t[0]
         xt = model.xt
         yt = model.yt
-        # zt = random.random()*(model.zmax-model.zmin)+model.zmin
         zt = 1.6
         model.zt = zt
-        #zt = model.zt
-        #self.ax.plot3D(xt,yt,zt)
         plt.scatter(xt,yt,marker='o')
-        #self.ax.plot3D(xt,yt,zt,'kp','MarkerSize',16,'MarkerFaceColor','g')
 
         plt.show()
-        
-        #hold off 
-        #plt.hold(False)
-        #plt.grid(True)
-        #plt.show()
 
         return model
 
 if __name__ == '__main__':
+    starttime = timeit.default_timer()
+    print("The start time is :",starttime)  
     np.random.seed(1)
     random.seed(1)
     Path_Generation = path_generation()
     
-    # xobs = np.array([])
-    # yobs = np.array([])
-    # zobs = np.array([])
-    # robs = np.array([])
-    # hobs = np.array([])
     xobs = np.array([-1.8, -1, -0.5,    0,      0.5,    1.7,  0])*5
     yobs = np.array([-1.8,  0,  1.5,    -0.5,   1.5,    -0.5, -2])*5
     zobs = np.array([2,   1.8,    1,    0.5,    1.5,    1.3,  2])*5
@@ -1095,6 +1022,8 @@ if __name__ == '__main__':
     # zt = np.array([1.8, 1.5, 1.2])
 
     Path_Generation.pso(xobs, yobs, zobs, robs, hobs, nObs, xmin, xmax, ymin, ymax, zmin, zmax, xs, ys, zs, xt, yt, zt)
+    print("The time difference is :", timeit.default_timer() - starttime)
+
 
 
 
