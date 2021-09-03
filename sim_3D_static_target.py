@@ -152,7 +152,9 @@ class Sim2D():
                 if (np.linalg.norm(self.obs_state[:2,n]-self.agent_state[:2,i])<self.obs_state[3,n]):
                     print('COLLISION OCCUR!')
                     print('Current Agent Position', self.agent_state[:,:3])
-                    exit()
+                    break
+            break
+            
 
 
     def step(self, agent_input, target_input, obs_input, return_copy = True):
